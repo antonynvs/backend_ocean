@@ -1,7 +1,7 @@
 /* Importa as dependências */
 const express = require('express');
 const cors = require('cors');
-const mysql = require('mysql2');
+const mysql = require ('mysql2');
 const jwt = require("jsonwebtoken")
 
 /* Cria o servidor WEB */
@@ -104,6 +104,64 @@ app.get("/verify", (request, response) => {
         response.json({ ok: true })
     })
 })
+
+app.post('/salvar-tempo', (req, res) => {
+    const { score } = req.body; 
+    const token = req.headers.authorization;
+
+    if (!token) {
+        return res.status(401).json({ message: 'Token não fornecido' });
+    }
+
+    try {
+      
+        const decoded = jwt.verify(token, SECRET_KEY);
+        const userId = decoded.id;
+
+        
+        const checkQuery = 'SELECT * FROM Scores WHERE user_id = ?';
+        db.query(checkQuery, [userId], (err, result) => {
+            if (err) {
+                return res.status(500).json({ message: 'Erro ao verificar pontuação', error: err });
+            }
+
+            if (result.length > 0) {
+              
+                const updateQuery = 'UPDATE Scores SET score = ? WHERE user_id = ?';
+                db.query(updateQuery, [score, userId], (err, updateResult) => {
+                    if (err) {
+                        return res.status(500).json({ message: 'Erro ao atualizar o tempo', error: err });
+                    }
+                    res.status(200).json({ message: 'Tempo atualizado com sucesso' });
+                });
+            } else {
+               
+                const insertQuery = 'INSERT INTO Scores (user_id, score) VALUES (?, ?)';
+                db.query(insertQuery, [userId, score], (err, insertResult) => {
+                    if (err) {
+                        return res.status(500).json({ message: 'Erro ao salvar o tempo', error: err });
+                    }
+                    res.status(200).json({ message: 'Tempo salvo com sucesso' });
+                });
+            }
+        });
+    } catch (err) {
+        res.status(500).json({ message: 'Erro ao verificar o token', error: err });
+    }
+});
+
+app.get('/ranking', (req, res) => {
+    const query = 'SELECT u.name, s.score FROM Scores s JOIN Users u ON s.user_id = u.id ORDER BY s.score ASC LIMIT 10';
+    
+    db.query(query, (err, results) => {
+        if (err) {
+            return res.status(500).json({ message: 'Erro ao buscar ranking', error: err });
+        }
+        
+        res.status(200).json(results); 
+    });
+});
+
 
 app.listen(3000, () => {
     console.log("Servidor rodando na porta 3000")
